@@ -22,7 +22,6 @@ func initLogger() logS {
 	}
 	// time.
 	output.FormatTimestamp = func(i interface{}) string {
-		fmt.Print("\033[H\033[2J")
 		return fmt.Sprintf("\033[38:5:241m%v", time.UnixMicro(time.Now().UnixMicro()).Format("15:04:05.000"))
 	}
 	output.FormatMessage = func(i interface{}) string {

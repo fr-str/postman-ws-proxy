@@ -3,7 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -15,7 +17,7 @@ import (
 type proxy struct {
 	origin   *websocket.Conn
 	target   *websocket.Conn
-	filePath string
+	fileName string
 }
 
 var (
@@ -38,12 +40,17 @@ func (p *proxy) originReader() {
 			if !p.connectTarget(v) {
 				continue
 			}
+
 		} else if !p.Connected(p.target) {
-			log.Error().Msgf("Error during target address read %v", m["Target"])
+			msg := fmt.Sprintf("Error during target address read %v", m["Target"])
+			log.Error().Msg(msg)
+			p.writeOrigin([]byte(msg), true)
+
 		}
-		if v, ok := m["ProxyFilePath"].(string); ok {
-			p.filePath = v
+		if v, ok := m["ProxyFileName"].(string); ok {
+			p.fileName = filepath.Join("/app/log-files", v)
 		}
+
 		delete(m, "Target")
 		delete(m, "ProxyFilePath")
 		log.PrintJSON(m)
@@ -54,20 +61,36 @@ func (p *proxy) originReader() {
 
 func (p *proxy) connectTarget(addr string) bool {
 	if addr == "" {
-		log.Error().Msg("Proxy address is empty")
+		msg := "Target address is empty"
+		log.Error().Msg(msg)
+		p.writeOrigin([]byte(msg), true)
+
 		return false
 	}
-	if !strings.HasSuffix(addr, "/") {
-		addr += "/"
+
+	addrL := strings.Split(addr, "?")
+
+	if !strings.HasSuffix(addrL[0], "/") {
+		addrL[0] += "/"
 	}
-	if p.target != nil && p.target.RemoteAddr().String() == addr && p.Connected(p.target) {
+	if p.target != nil && p.target.RemoteAddr().String() == addrL[0] && p.Connected(p.target) {
 		return true
 	}
+	var header http.Header
+	if len(addrL) > 1 {
+		header = http.Header{}
+		for _, element := range strings.Split(addrL[1], "&") {
+			kv := strings.Split(element, "=")
+			header.Add(kv[0], kv[1])
+		}
+	}
+
 	log.Debug().Msgf("Starting new connection: %s", addr)
-	conn, _, err := websocket.DefaultDialer.Dial(addr, nil)
+	conn, _, err := websocket.DefaultDialer.Dial(addr, header)
 	if err != nil {
-		log.Error().Msgf("Target dial error: %v", err)
-		p.writeOrigin([]byte(fmt.Sprintf("Target dial error: %v", err)))
+		msg := fmt.Sprintf("Target dial error: %v", err)
+		log.Error().Msg(msg)
+		p.writeOrigin([]byte(msg), true)
 	}
 
 	p.target = conn
@@ -82,6 +105,8 @@ func (p *proxy) writeTarget(v any) {
 	err := p.target.WriteJSON(v)
 	if err != nil {
 		log.Error().Msgf("Writing target error: %v", err)
+		p.writeOrigin([]byte(fmt.Sprintf("Writing target error: %v", err)), true)
+
 	}
 
 }
@@ -101,16 +126,19 @@ func (p *proxy) readTarget() {
 			}
 		}
 		p.writeToFile(b)
-		p.writeOrigin(b)
+		p.writeOrigin(b, false)
 	}
 }
 
-func (p *proxy) writeOrigin(v []byte) {
+func (p *proxy) writeOrigin(v []byte, err bool) {
 	if v == nil {
 		return
 	}
-	err := p.origin.WriteMessage(websocket.TextMessage, v)
-	if err != nil {
+	if err {
+		v = append([]byte("Proxy: "), v...)
+	}
+	errx := p.origin.WriteMessage(websocket.TextMessage, v)
+	if errx != nil {
 		log.Error().Msgf("Writing Origin error: %v", err)
 	}
 }
@@ -123,20 +151,32 @@ func (p *proxy) writeToFile(data []byte) {
 	if len(data) == 0 {
 		return
 	}
-	f, err := os.OpenFile(p.filePath, os.O_WRONLY|os.O_CREATE /* |os.O_APPEND */, 0644)
+	log.Debug().Msgf("logFile %s", p.fileName)
+	f, err := os.OpenFile(p.fileName, os.O_WRONLY|os.O_CREATE /* |os.O_APPEND */, 0644)
 	if err != nil {
 		return
 	}
 	defer f.Close()
+
+	// black magic
+	// --------------------------------------------------
 	file := map[string]interface{}{}
 	m := map[string]interface{}{}
-	b := make([]byte, 10<<20)
-	i, err := f.Read(b)
-	log.Info().Msgf("len: %d,%v", i, err)
+	// doing f.Read() returns 'bad file descriptor' and it's late, will fix it later
+	// TODO fix
+	b, err := os.ReadFile(p.fileName)
+	if err != nil {
+		msg := fmt.Sprintf("Writing to file: %v", err)
+		log.Error().Msgf(msg)
+		p.writeOrigin([]byte(msg), true)
+	}
+
 	json.Unmarshal(b, &file)
 	json.Unmarshal(data, &m)
 	file[strconv.Itoa(int(time.Now().UnixMicro()))] = m
 	data, _ = json.MarshalIndent(file, " ", "  ")
+	// --------------------------------------------------
+
 	_, err = f.Write(data)
 	if err != nil {
 		return

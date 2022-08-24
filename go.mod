@@ -1,4 +1,4 @@
-module postman-poxy
+module postman-proxy
 
 go 1.19
 
