@@ -3,7 +3,6 @@ module postman-proxy
 go 1.19
 
 require (
-	github.com/fr-str/var-peek v0.0.0-20220824140236-217cfa148355
 	github.com/gorilla/websocket v1.5.0
 	github.com/main-kube/util v0.0.0-20220824130840-1ae10d265801
 	github.com/rs/zerolog v1.27.0

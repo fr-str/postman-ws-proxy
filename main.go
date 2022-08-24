@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gorilla/websocket"
@@ -12,18 +13,19 @@ var upgrader = websocket.Upgrader{
 
 func main() {
 	http.HandleFunc("/", Handler)
-	log.Info().Msgf("Listening on %d", 8008)
-	http.ListenAndServe(":8008", nil)
+	log.Info().Msgf("Listening on %s", config.Port)
+	go cleanConns()
+	http.ListenAndServe(fmt.Sprintf(":%v", config.Port), nil)
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
 	// Upgrade raw HTTP connection to a websocket based one
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Error().Msgf("Error during connection upgradation: %v", err)
+		log.Logger.Error().Msgf("Error during connection upgrade: %v", err)
 		return
 	}
-	log.Debug().Msgf("Incoming websocket connection: %v", conn.RemoteAddr().String())
+	log.Info().Msgf("Incoming websocket connection: %v", conn.RemoteAddr().String())
 	p := &proxy{
 		origin: conn,
 	}

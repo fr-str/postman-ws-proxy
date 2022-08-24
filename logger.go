@@ -30,14 +30,19 @@ func initLogger() logS {
 	output.FormatFieldName = func(i interface{}) string {
 		return fmt.Sprintf("%s:", i)
 	}
+	zerolog.SetGlobalLevel(config.LogLevel)
 
 	return logS{zerolog.New(output).With().Timestamp().Logger()}
 }
 
 func (log *logS) PrintJSON(v interface{}) {
-	log.Info().MsgFunc(func() string {
+	log.Logger.Info().MsgFunc(func() string {
 		b, _ := json.MarshalIndent(v, " ", "  ")
 		return "\n" + string(b)
 	})
+}
 
+func (l *logS) Error(p *proxy, v any) {
+	log.Logger.Error().Msgf("%v", v)
+	p.writeOrigin([]byte(fmt.Sprintf("Proxy: %v", v)))
 }

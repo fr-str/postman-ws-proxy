@@ -1,9 +1,6 @@
 # github.com/evanphx/json-patch v0.5.2
 ## explicit; go 1.14
 github.com/evanphx/json-patch
-# github.com/fr-str/var-peek v0.0.0-20220824140236-217cfa148355
-## explicit; go 1.18
-github.com/fr-str/var-peek
 # github.com/google/uuid v1.3.0
 ## explicit
 github.com/google/uuid
@@ -13,6 +10,7 @@ github.com/gorilla/websocket
 # github.com/main-kube/util v0.0.0-20220824130840-1ae10d265801
 ## explicit; go 1.19
 github.com/main-kube/util
+github.com/main-kube/util/env
 github.com/main-kube/util/safe
 github.com/main-kube/util/set
 github.com/main-kube/util/slice
