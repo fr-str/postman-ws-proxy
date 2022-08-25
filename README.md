@@ -1,4 +1,6 @@
-# postman-ws-proxy v0.1
+# postman-ws-proxy v0.2
+## now when i think about it it's more of a forwarder than proxy ¯\\\_(ツ)_/¯
+--------------
 
 ### postman-ws-proxy saves all recived text messges to file specified
 ### supports ws and wss and http.Header
@@ -26,6 +28,7 @@
 | ---------:            |-------|     
 | **PP_PORT string**    | 8008 |
 | **PP_LOG_LEVEL int8** | 1 |
+| **PP_LOG_FILE_PATH string** | filepath.Join(home, ".proxylog/") |
 
 
 ## log levels same as zerolog

@@ -1,8 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/gorilla/websocket"
 )
@@ -12,10 +14,14 @@ var upgrader = websocket.Upgrader{
 }
 
 func main() {
-	http.HandleFunc("/", Handler)
-	log.Info().Msgf("Listening on %s", config.Port)
+	http.HandleFunc("/api/", Handler)
+	log.Info().Msgf("Listening on %s", config.ProxyAddr)
 	go cleanConns()
-	http.ListenAndServe(fmt.Sprintf(":%v", config.Port), nil)
+	if err := os.Mkdir(config.ProxyLogFilePath, 0755); err != nil && !strings.Contains(err.Error(), "file exists") {
+		panic(err)
+	}
+
+	log.Fatal().Msgf("%v", http.ListenAndServe(config.ProxyAddr, nil))
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -27,7 +33,8 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Info().Msgf("Incoming websocket connection: %v", conn.RemoteAddr().String())
 	p := &proxy{
-		origin: conn,
+		origin:   conn,
+		fileName: filepath.Join(config.ProxyLogFilePath, "logs"),
 	}
 	conns.Set(conn.RemoteAddr().String(), p)
 	go p.originReader()

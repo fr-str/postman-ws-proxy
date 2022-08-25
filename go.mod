@@ -3,8 +3,9 @@ module postman-proxy
 go 1.19
 
 require (
+	github.com/buger/jsonparser v1.1.1
 	github.com/gorilla/websocket v1.5.0
-	github.com/main-kube/util v0.0.0-20220824130840-1ae10d265801
+	github.com/main-kube/util v0.0.0-20220824201012-0d0711578737
 	github.com/rs/zerolog v1.27.0
 )
 

@@ -35,10 +35,10 @@ func initLogger() logS {
 	return logS{zerolog.New(output).With().Timestamp().Logger()}
 }
 
-func (log *logS) PrintJSON(v interface{}) {
-	log.Logger.Info().MsgFunc(func() string {
+func (log *logS) PrintJSON(msg string, v interface{}) {
+	log.Logger.Debug().MsgFunc(func() string {
 		b, _ := json.MarshalIndent(v, " ", "  ")
-		return "\n" + string(b)
+		return msg + "\n" + string(b)
 	})
 }
 

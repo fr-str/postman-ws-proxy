@@ -1,3 +1,6 @@
+# github.com/buger/jsonparser v1.1.1
+## explicit; go 1.13
+github.com/buger/jsonparser
 # github.com/evanphx/json-patch v0.5.2
 ## explicit; go 1.14
 github.com/evanphx/json-patch
@@ -7,7 +10,7 @@ github.com/google/uuid
 # github.com/gorilla/websocket v1.5.0
 ## explicit; go 1.12
 github.com/gorilla/websocket
-# github.com/main-kube/util v0.0.0-20220824130840-1ae10d265801
+# github.com/main-kube/util v0.0.0-20220824201012-0d0711578737
 ## explicit; go 1.19
 github.com/main-kube/util
 github.com/main-kube/util/env

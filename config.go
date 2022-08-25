@@ -1,13 +1,17 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/main-kube/util/env"
 	"github.com/rs/zerolog"
 )
 
 type configS struct {
-	Port     string
-	LogLevel zerolog.Level
+	ProxyAddr        string
+	LogLevel         zerolog.Level
+	ProxyLogFilePath string
 }
 
 // DebugLevel defines debug log level.
@@ -28,8 +32,11 @@ type configS struct {
 // - Disabled 7
 
 var (
-	config = configS{
-		Port:     env.Get("PP_PORT", "8008"),
-		LogLevel: env.Get[zerolog.Level]("PP_LOG_LEVEL", 1),
+	home, _ = os.UserHomeDir()
+	config  = configS{
+		ProxyAddr:        env.Get("PP_ADDRESS", ":8008"),
+		LogLevel:         env.Get("PP_LOG_LEVEL", zerolog.Level(1)),
+		ProxyLogFilePath: env.Get("PP_LOG_FILE_PATH", filepath.Join(home, ".proxylog/")),
 	}
+	// got home directory
 )

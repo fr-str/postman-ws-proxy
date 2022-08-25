@@ -3,13 +3,14 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
+	jsp "github.com/buger/jsonparser"
 	"github.com/gorilla/websocket"
 	"github.com/main-kube/util/safe"
 )
@@ -26,10 +27,14 @@ var (
 
 // just to make sure map is not holding closed conns
 func cleanConns() {
-	for I := range conns.Iter() {
-		if !I.Value.connected(I.Value.origin) {
-			I.Value.target.Close()
-			conns.Delete(I.Key)
+	for range time.Tick(time.Second) {
+		for I := range conns.Iter() {
+			if !I.Value.connected(I.Value.origin) {
+				if I.Value.target != nil {
+					I.Value.target.Close()
+				}
+				conns.Delete(I.Key)
+			}
 		}
 	}
 }
@@ -40,38 +45,44 @@ func (p *proxy) connected(conn *websocket.Conn) bool {
 
 func (p *proxy) originReader() {
 	// Reading from the connection
-	m := map[string]interface{}{}
 	for {
-		err := p.origin.ReadJSON(&m)
+		_, msg, err := p.origin.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
 				log.Info().Msgf("Connection closed: %v", err)
+				if p.target != nil {
+					p.target.Close()
+				}
 				conns.Delete(p.origin.RemoteAddr().String())
 				return
 			}
 		}
+		proxyTarget, _ := jsp.GetString(msg, "ProxyTarget")
+		proxyFileName, _ := jsp.GetString(msg, "ProxyFileName")
+		msg = jsp.Delete(msg, "ProxyFileName")
+		msg = jsp.Delete(msg, "ProxyTarget")
 
-		if v, ok := m["ProxyTarget"].(string); ok && !p.connected(p.target) {
-			if !p.connectTarget(v) {
+		if proxyTarget != "" && !p.connected(p.target) {
+			if !p.connectTarget(proxyTarget) {
 				continue
 			}
 
 		} else if !p.connected(p.target) {
 
-			log.Error(p, fmt.Sprintf("Error during target address read %v", m["ProxyTarget"]))
+			log.Error(p, fmt.Sprintf("Error during target address read , ProxyTarget = %v", proxyTarget))
 
 		}
-		if v, ok := m["ProxyFileName"].(string); ok {
-			p.fileName = filepath.Join("/app/log-files", v)
-		} else {
-			p.fileName = "/app/log-files/logs"
-
+		if proxyFileName != "" {
+			p.fileName = filepath.Join(config.ProxyLogFilePath, proxyFileName)
 		}
 
-		delete(m, "ProxyTarget")
-		delete(m, "ProxyFilePath")
-		log.PrintJSON(m)
-		p.writeTarget(m)
+		if config.LogLevel == 0 {
+			m := map[string]interface{}{}
+			json.Unmarshal(msg, &m)
+			log.PrintJSON("Message sent to target:", m)
+		}
+
+		p.writeTarget(msg)
 	}
 }
 
@@ -129,6 +140,9 @@ func (p *proxy) readTarget() {
 	}
 	log.Info().Msgf("Reading target: %s", p.target.RemoteAddr().String())
 	for {
+		if !p.connected(p.target) {
+			return
+		}
 		_, b, err := p.target.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
@@ -142,11 +156,12 @@ func (p *proxy) readTarget() {
 	}
 }
 
-func (p *proxy) writeTarget(v any) {
+func (p *proxy) writeTarget(v []byte) {
 	if v == nil || p.target == nil {
 		return
 	}
-	err := p.target.WriteJSON(v)
+	log.Info().Msgf("Writing target, msg length: %d", len(v))
+	err := p.target.WriteMessage(websocket.TextMessage, v)
 	if err != nil {
 		log.Error(p, fmt.Sprintf("Writing target error: %v", err))
 	}
@@ -158,7 +173,7 @@ func (p *proxy) writeToFile(data []byte) {
 		return
 	}
 	log.Debug().Msgf("logFile %s", p.fileName)
-	f, err := os.OpenFile(p.fileName, os.O_WRONLY|os.O_CREATE /* |os.O_APPEND */, 0644)
+	f, err := os.OpenFile(p.fileName, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		return
 	}
@@ -168,21 +183,30 @@ func (p *proxy) writeToFile(data []byte) {
 	// --------------------------------------------------
 	file := map[string]interface{}{}
 	m := map[string]interface{}{}
-	// doing f.Read() returns 'bad file descriptor' and it's late, will fix it later
-	// TODO fix
-	b, err := os.ReadFile(p.fileName)
-	if err != nil {
-		log.Error(p, fmt.Sprintf("Writing to file: %v", err))
+	b := make([]byte, 5<<20)
+	var i int
+	i, err = f.Read(b)
+	if err != nil && err != io.EOF {
+		log.Error(p, fmt.Sprintf("Reading file: %v", err))
+	}
+	f.Truncate(0)
+	f.Seek(0, 0)
+
+	log.Debug().Msgf("Read from file: %d", i)
+	if i > 0 {
+		if err = json.Unmarshal(b[:i], &file); err != nil {
+			log.Logger.Error().Msgf("error: %v", err)
+		}
 	}
 
-	json.Unmarshal(b, &file)
 	json.Unmarshal(data, &m)
-	file[strconv.Itoa(int(time.Now().UnixMicro()))] = m
+	file[time.UnixMicro(time.Now().UnixMicro()).Format("15:04:05.000")] = m
 	data, _ = json.MarshalIndent(file, " ", "  ")
 	// --------------------------------------------------
 
 	_, err = f.Write(data)
 	if err != nil {
+		log.Error(p, fmt.Sprintf("Writing to file: %v", err))
 		return
 	}
 

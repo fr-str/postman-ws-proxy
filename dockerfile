@@ -1,13 +1,22 @@
 FROM golang:1.19.0 as build
 
+RUN mkdir /build
+WORKDIR /build
+COPY . .
+RUN CGO_ENABLED=0 go build 
+
 
 RUN mkdir /app
 WORKDIR /app
-COPY . .
-RUN go build 
 
-ENV PP_PORT=8008
+FROM alpine:3.16.2
 
-CMD ["/bin/sh","-c","/app/postman-proxy"]
+RUN mkdir /app
+WORKDIR /app
+COPY --from=build /build/postman-proxy pp
+ENV PP_PORT=8008 \
+PP_LOG_FILE=/app/log-files/
+
+CMD ["/bin/sh","-c","/app/pp"]
 
 
