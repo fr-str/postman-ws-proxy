@@ -203,7 +203,7 @@ func (p *proxy) writeToFile(data []byte) {
 	file[time.UnixMicro(time.Now().UnixMicro()).Format("15:04:05.000")] = m
 	data, _ = json.MarshalIndent(file, " ", "  ")
 	// --------------------------------------------------
-
+	log.Debug().Msgf("Write to file: %v", len(data))
 	_, err = f.Write(data)
 	if err != nil {
 		log.Error(p, fmt.Sprintf("Writing to file: %v", err))

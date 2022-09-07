@@ -15,7 +15,8 @@ RUN mkdir /app
 WORKDIR /app
 COPY --from=build /build/postman-proxy pp
 ENV PP_PORT=8008 \
-PP_LOG_FILE=/app/log-files/
+    PP_LOG_FILE_PATH=/app/log-files \
+    PP_LOG_LEVEL=1
 
 CMD ["/bin/sh","-c","/app/pp"]
 

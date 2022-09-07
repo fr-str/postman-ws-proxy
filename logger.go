@@ -22,7 +22,7 @@ func initLogger() logS {
 	}
 	// time.
 	output.FormatTimestamp = func(i interface{}) string {
-		return fmt.Sprintf("\033[38:5:241m%v", time.UnixMicro(time.Now().UnixMicro()).Format("15:04:05.000"))
+		return fmt.Sprintf("\033[38:5:241m%v", time.UnixMicro(time.Now().UnixMicro()).Format("Jan 2 15:04:05.000"))
 	}
 	output.FormatMessage = func(i interface{}) string {
 		return fmt.Sprintf("| %s", i)
@@ -30,7 +30,7 @@ func initLogger() logS {
 	output.FormatFieldName = func(i interface{}) string {
 		return fmt.Sprintf("%s:", i)
 	}
-	zerolog.SetGlobalLevel(config.LogLevel)
+	zerolog.SetGlobalLevel(zerolog.Level(config.LogLevel))
 
 	return logS{zerolog.New(output).With().Timestamp().Logger()}
 }

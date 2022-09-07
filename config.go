@@ -5,12 +5,11 @@ import (
 	"path/filepath"
 
 	"github.com/main-kube/util/env"
-	"github.com/rs/zerolog"
 )
 
 type configS struct {
 	ProxyAddr        string
-	LogLevel         zerolog.Level
+	LogLevel         int
 	ProxyLogFilePath string
 }
 
@@ -35,7 +34,7 @@ var (
 	home, _ = os.UserHomeDir()
 	config  = configS{
 		ProxyAddr:        env.Get("PP_ADDRESS", ":8008"),
-		LogLevel:         env.Get("PP_LOG_LEVEL", zerolog.Level(1)),
+		LogLevel:         env.Get("PP_LOG_LEVEL", 1),
 		ProxyLogFilePath: env.Get("PP_LOG_FILE_PATH", filepath.Join(home, ".proxylog/")),
 	}
 	// got home directory

@@ -20,7 +20,6 @@ func main() {
 	if err := os.Mkdir(config.ProxyLogFilePath, 0755); err != nil && !strings.Contains(err.Error(), "file exists") {
 		panic(err)
 	}
-
 	log.Fatal().Msgf("%v", http.ListenAndServe(config.ProxyAddr, nil))
 }
 
