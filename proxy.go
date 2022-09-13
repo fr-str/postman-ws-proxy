@@ -16,9 +16,10 @@ import (
 )
 
 type proxy struct {
-	origin   *websocket.Conn
-	target   *websocket.Conn
-	fileName string
+	origin     *websocket.Conn
+	target     *websocket.Conn
+	targetAddr string
+	fileName   string
 }
 
 var (
@@ -61,9 +62,14 @@ func (p *proxy) originReader() {
 		proxyFileName, _ := jsp.GetString(msg, "ProxyFileName")
 		msg = jsp.Delete(msg, "ProxyFileName")
 		msg = jsp.Delete(msg, "ProxyTarget")
-
+		if p.targetAddr != "" && proxyTarget != p.targetAddr {
+			log.Info().Msgf("Switching conn from '%s' to '%s'", p.targetAddr, proxyTarget)
+			log.Debug().Msgf("Closing conn: %s", p.targetAddr)
+			p.target.Close()
+		}
 		if proxyTarget != "" && !p.connected(p.target) {
-			if !p.connectTarget(proxyTarget) {
+			p.targetAddr = proxyTarget
+			if !p.connectTarget() {
 				continue
 			}
 
@@ -97,14 +103,14 @@ func (p *proxy) writeOrigin(v []byte) {
 	}
 }
 
-func (p *proxy) connectTarget(addr string) bool {
-	if addr == "" {
+func (p *proxy) connectTarget() bool {
+	if p.targetAddr == "" {
 		log.Error(p, "Target address is empty")
 
 		return false
 	}
 
-	addrL := strings.Split(addr, "?")
+	addrL := strings.Split(p.targetAddr, "?")
 
 	if !strings.HasSuffix(addrL[0], "/") {
 		addrL[0] += "/"
@@ -123,8 +129,8 @@ func (p *proxy) connectTarget(addr string) bool {
 		}
 	}
 
-	log.Info().Msgf("Starting new connection: %s", addr)
-	conn, _, err := websocket.DefaultDialer.Dial(addr, header)
+	log.Info().Msgf("Starting new connection: %s", p.targetAddr)
+	conn, _, err := websocket.DefaultDialer.Dial(addrL[0], header)
 	if err != nil {
 		log.Error(p, fmt.Sprintf("Target dial error: %v", err))
 	}
@@ -147,7 +153,7 @@ func (p *proxy) readTarget() {
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
 				log.Info().Msgf("Connection closed: %v", err)
-				p.connectTarget(p.target.RemoteAddr().String())
+				p.connectTarget()
 				return
 			}
 		}
